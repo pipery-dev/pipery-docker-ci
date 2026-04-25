@@ -50,10 +50,19 @@ fi
 
 echo "Running hadolint on $DOCKERFILE_PATH..."
 
+# Build config flag: use .hadolint.yaml from the project directory if present
+HADOLINT_CONFIG_FLAG=""
+PROJECT_HADOLINT="${PROJECT_PATH}/.hadolint.yaml"
+if [ -f "$PROJECT_HADOLINT" ]; then
+  HADOLINT_CONFIG_FLAG="--config ${PROJECT_HADOLINT}"
+fi
+
 if command -v psh &>/dev/null && psh --version &>/dev/null 2>&1; then
-  psh -log-file "$LOG" -fail-on-error -c "hadolint ${DOCKERFILE_PATH}"
+  # shellcheck disable=SC2086
+  psh -log-file "$LOG" -fail-on-error -c "hadolint ${HADOLINT_CONFIG_FLAG} ${DOCKERFILE_PATH}"
 else
-  hadolint "$DOCKERFILE_PATH"
+  # shellcheck disable=SC2086
+  hadolint $HADOLINT_CONFIG_FLAG "$DOCKERFILE_PATH"
 fi
 
 echo "Lint passed."

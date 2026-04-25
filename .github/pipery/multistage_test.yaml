@@ -1,0 +1,17 @@
+name: multistage-dockerfile
+description: Verify the action builds and tests a multi-stage Dockerfile correctly.
+source_path: test-project-multistage
+inputs:
+  project_path: test-project-multistage
+  image_name: test-multistage-pipery
+  skip_sast: "true"
+  skip_sca: "true"
+  skip_release: "true"
+  skip_versioning: "true"
+  skip_reintegration: "true"
+expect:
+  log_path: pipery.jsonl
+  success_values: [success, passed, ok, succeeded]
+  required_fields:
+    - name: event
+      value: build

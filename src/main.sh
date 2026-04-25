@@ -22,7 +22,7 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
   export INPUT_PROJECT_PATH="$PROJECT_PATH"
 
   if [ "${INPUT_SKIP_LINT:-false}" != "true" ]; then
-    bash "$SCRIPT_DIR/step-lint.sh" || true
+    bash "$SCRIPT_DIR/step-lint.sh"
   fi
 
   if [ "${INPUT_SKIP_SAST:-false}" != "true" ]; then
@@ -34,11 +34,11 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
   fi
 
   if [ "${INPUT_SKIP_BUILD:-false}" != "true" ]; then
-    bash "$SCRIPT_DIR/step-build.sh" || true
+    bash "$SCRIPT_DIR/step-build.sh"
   fi
 
   if [ "${INPUT_SKIP_TEST:-false}" != "true" ]; then
-    bash "$SCRIPT_DIR/step-test.sh" || true
+    bash "$SCRIPT_DIR/step-test.sh"
   fi
 
   if [ "${INPUT_SKIP_VERSIONING:-false}" != "true" ]; then
