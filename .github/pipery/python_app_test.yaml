@@ -1,0 +1,17 @@
+name: python-app-docker
+description: Verify the action builds a Python application Docker image.
+source_path: test-project-python-app
+inputs:
+  project_path: test-project-python-app
+  image_name: test-python-app-pipery
+  skip_sast: "true"
+  skip_sca: "true"
+  skip_release: "true"
+  skip_versioning: "true"
+  skip_reintegration: "true"
+expect:
+  log_path: pipery.jsonl
+  success_values: [success, passed, ok, succeeded]
+  required_fields:
+    - name: event
+      value: build

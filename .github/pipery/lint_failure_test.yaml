@@ -1,0 +1,16 @@
+name: hadolint-errors-detected
+description: Action must exit non-zero when hadolint finds Dockerfile violations.
+source_path: test-project-lint-errors
+inputs:
+  project_path: test-project-lint-errors
+  image_name: test-lint-error-image
+  skip_sast: "true"
+  skip_sca: "true"
+  skip_build: "true"
+  skip_test: "true"
+  skip_versioning: "true"
+  skip_packaging: "true"
+  skip_release: "true"
+  skip_reintegration: "true"
+expect:
+  failure: true
