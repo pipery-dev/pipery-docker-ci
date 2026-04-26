@@ -7,7 +7,8 @@ REGISTRY_PASSWORD="${INPUT_REGISTRY_PASSWORD:-}"
 IMAGE_NAME="${INPUT_IMAGE_NAME:-}"
 IMAGE_TAG="${INPUT_IMAGE_TAG:-latest}"
 VERSION="${INPUT_VERSION:-}"
-SHORT_SHA="${GITHUB_SHA:0:7}"
+SHORT_SHA="${GITHUB_SHA:-}"
+SHORT_SHA="${SHORT_SHA:0:7}"
 
 if [ -z "$REGISTRY_PASSWORD" ]; then
   echo "No registry credentials provided, skipping push."
