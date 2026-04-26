@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env psh
 set -euo pipefail
 
 LOG="${INPUT_LOG_FILE:-pipery.jsonl}"
@@ -18,7 +18,6 @@ pipery-steps sca \
   --log-file "$LOG" \
   || echo "SCA completed with warnings (non-fatal)."
 
-# Run trivy scan if available
 if command -v trivy &>/dev/null; then
   if [ -n "$IMAGE_NAME" ]; then
     TAG="${IMAGE_NAME}:${IMAGE_TAG}"
