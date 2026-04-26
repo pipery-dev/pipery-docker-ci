@@ -58,4 +58,5 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
   fi
 fi
 
-printf '{"event":"build","status":"success","project":"docker","mode":"ci"}\n' >> "${INPUT_LOG_FILE:-pipery.jsonl}"
+CI_STATUS="${PIPERY_CI_STATUS:-success}"
+printf '{"event":"build","status":"%s","project":"docker","mode":"ci"}\n' "$CI_STATUS" >> "${INPUT_LOG_FILE:-pipery.jsonl}"

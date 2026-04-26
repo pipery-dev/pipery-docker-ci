@@ -179,6 +179,7 @@ runs:
       env:
         INPUT_IMAGE_NAME: ${{ inputs.image_name }}
         INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_VERSION: ${{ steps.versioning.outputs.version }}
         INPUT_LOG_FILE: ${{ inputs.log_file }}
 
     - id: release
@@ -192,6 +193,7 @@ runs:
         INPUT_REGISTRY_PASSWORD: ${{ inputs.registry_password }}
         INPUT_IMAGE_NAME: ${{ inputs.image_name }}
         INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_VERSION: ${{ steps.versioning.outputs.version }}
         INPUT_LOG_FILE: ${{ inputs.log_file }}
 
     - id: reintegration
@@ -212,6 +214,7 @@ runs:
       env:
         INPUT_PROJECT_PATH: ${{ inputs.project_path }}
         INPUT_LOG_FILE: ${{ inputs.log_file }}
+        PIPERY_CI_STATUS: ${{ job.status }}
 
     - id: upload-logs
       name: Upload logs
