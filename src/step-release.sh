@@ -8,6 +8,7 @@ REGISTRY_PASSWORD="${INPUT_REGISTRY_PASSWORD:-}"
 IMAGE_NAME="${INPUT_IMAGE_NAME:-}"
 IMAGE_TAG="${INPUT_IMAGE_TAG:-latest}"
 VERSION="${INPUT_VERSION:-}"
+SHORT_SHA="${GITHUB_SHA:0:7}"
 
 if [ -z "$REGISTRY_PASSWORD" ]; then
   echo "No registry credentials provided, skipping push."
@@ -19,10 +20,17 @@ if [ -z "$IMAGE_NAME" ]; then
   exit 0
 fi
 
+_tag_and_push() {
+  local src="$1" dst="$2"
+  docker tag "$src" "$dst"
+  docker push "$dst"
+}
+
 echo "Logging in to registry: $REGISTRY..."
 if command -v psh &>/dev/null && psh --version &>/dev/null 2>&1; then
   echo "$REGISTRY_PASSWORD" | psh -log-file "$LOG" -fail-on-error -c "docker login ${REGISTRY} -u ${REGISTRY_USERNAME} --password-stdin"
   psh -log-file "$LOG" -fail-on-error -c "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+  psh -log-file "$LOG" -fail-on-error -c "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:sha-${SHORT_SHA} && docker push ${IMAGE_NAME}:sha-${SHORT_SHA}"
   if [ -n "$VERSION" ]; then
     MINOR="$(echo "$VERSION" | cut -d. -f1-2)"
     MAJOR="$(echo "$VERSION" | cut -d. -f1)"
@@ -33,6 +41,7 @@ if command -v psh &>/dev/null && psh --version &>/dev/null 2>&1; then
 else
   echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
   docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+  _tag_and_push "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}:sha-${SHORT_SHA}"
   if [ -n "$VERSION" ]; then
     MINOR="$(echo "$VERSION" | cut -d. -f1-2)"
     MAJOR="$(echo "$VERSION" | cut -d. -f1)"
@@ -42,4 +51,4 @@ else
   fi
 fi
 
-echo "Image pushed: ${IMAGE_NAME}:${IMAGE_TAG}"
+echo "Image pushed: ${IMAGE_NAME}:${IMAGE_TAG} sha-${SHORT_SHA}"
