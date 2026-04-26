@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env psh
 set -euo pipefail
 
 LOG="${INPUT_LOG_FILE:-pipery.jsonl}"
@@ -22,7 +22,6 @@ VERSION_OUTPUT="$(pipery-steps version \
 
 echo "$VERSION_OUTPUT"
 
-# Write to GITHUB_OUTPUT if available
 NEW_VERSION="$(echo "$VERSION_OUTPUT" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+' | tail -1 || true)"
 if [ -n "$NEW_VERSION" ] && [ -n "${GITHUB_OUTPUT:-}" ]; then
   echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"

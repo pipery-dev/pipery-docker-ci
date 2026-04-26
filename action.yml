@@ -49,6 +49,10 @@ inputs:
     description: 'Skip the Docker build step.'
     required: false
     default: 'false'
+  tests_path:
+    description: 'Command or script to run inside the container for testing. Defaults to a smoke test.'
+    required: false
+    default: ''
   skip_test:
     description: 'Skip the container smoke test step.'
     required: false
@@ -159,6 +163,7 @@ runs:
       env:
         INPUT_IMAGE_NAME: ${{ inputs.image_name }}
         INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_TESTS_PATH: ${{ inputs.tests_path }}
         INPUT_LOG_FILE: ${{ inputs.log_file }}
 
     - id: versioning
@@ -195,6 +200,7 @@ runs:
         INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
         INPUT_VERSION: ${{ steps.versioning.outputs.version }}
         INPUT_LOG_FILE: ${{ inputs.log_file }}
+        GITHUB_SHA: ${{ github.sha }}
 
     - id: reintegration
       name: Reintegration

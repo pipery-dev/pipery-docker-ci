@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env psh
 set -euo pipefail
 
 LOG="${INPUT_LOG_FILE:-pipery.jsonl}"

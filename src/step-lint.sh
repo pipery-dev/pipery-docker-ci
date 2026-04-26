@@ -1,14 +1,11 @@
-#!/usr/bin/env bash
+#!/usr/bin/env psh
 set -euo pipefail
 
-LOG="${INPUT_LOG_FILE:-pipery.jsonl}"
 PROJECT_PATH="${INPUT_PROJECT_PATH:-.}"
 DOCKERFILE="${INPUT_DOCKERFILE:-Dockerfile}"
 
-# Install hadolint if not present
 if ! command -v hadolint &>/dev/null; then
   echo "hadolint not found, attempting to install..."
-  # Pick the right binary for the current platform
   OS="$(uname -s)"
   ARCH="$(uname -m)"
   if [ "$OS" = "Linux" ] && [ "$ARCH" = "x86_64" ]; then
@@ -23,8 +20,7 @@ if ! command -v hadolint &>/dev/null; then
   fi
 
   if [ -n "$HADOLINT_URL" ] && curl -fsSL "$HADOLINT_URL" -o /tmp/hadolint 2>/dev/null; then
-    INSTALL_DIR="/usr/local/bin"
-    install -m755 /tmp/hadolint "$INSTALL_DIR/hadolint" 2>/dev/null || {
+    sudo install -m755 /tmp/hadolint /usr/local/bin/hadolint 2>/dev/null || {
       mkdir -p "$HOME/.local/bin"
       install -m755 /tmp/hadolint "$HOME/.local/bin/hadolint"
       export PATH="$HOME/.local/bin:$PATH"
@@ -36,7 +32,6 @@ if ! command -v hadolint &>/dev/null; then
   fi
 fi
 
-# Verify hadolint is actually runnable (not a wrong-arch binary)
 if ! hadolint --version &>/dev/null 2>&1; then
   echo "hadolint is not executable on this platform, skipping lint step gracefully."
   exit 0
@@ -50,19 +45,12 @@ fi
 
 echo "Running hadolint on $DOCKERFILE_PATH..."
 
-# Build config flag: use .hadolint.yaml from the project directory if present
 HADOLINT_CONFIG_FLAG=""
-PROJECT_HADOLINT="${PROJECT_PATH}/.hadolint.yaml"
-if [ -f "$PROJECT_HADOLINT" ]; then
-  HADOLINT_CONFIG_FLAG="--config ${PROJECT_HADOLINT}"
+if [ -f "${PROJECT_PATH}/.hadolint.yaml" ]; then
+  HADOLINT_CONFIG_FLAG="--config ${PROJECT_PATH}/.hadolint.yaml"
 fi
 
-if command -v psh &>/dev/null && psh --version &>/dev/null 2>&1; then
-  # shellcheck disable=SC2086
-  psh -log-file "$LOG" -fail-on-error -c "hadolint ${HADOLINT_CONFIG_FLAG} ${DOCKERFILE_PATH}"
-else
-  # shellcheck disable=SC2086
-  hadolint $HADOLINT_CONFIG_FLAG "$DOCKERFILE_PATH"
-fi
+# shellcheck disable=SC2086
+hadolint $HADOLINT_CONFIG_FLAG "$DOCKERFILE_PATH"
 
 echo "Lint passed."
