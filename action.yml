@@ -2,24 +2,239 @@ name: 'Pipery Docker CI'
 description: 'CI pipeline for Docker: lint (hadolint), SAST, SCA, build, test, versioning, push image, reintegration'
 inputs:
   project_path:
-    description: 'Path to the project source tree the action should operate on.'
+    description: 'Path to the project source tree.'
     required: false
     default: '.'
+  config_file:
+    description: 'Path to a config file for the action.'
+    required: false
+    default: ''
+  dockerfile:
+    description: 'Dockerfile name relative to project_path.'
+    required: false
+    default: 'Dockerfile'
+  image_name:
+    description: 'Name of the Docker image to build.'
+    required: false
+    default: ''
+  image_tag:
+    description: 'Tag for the Docker image.'
+    required: false
+    default: 'latest'
+  registry:
+    description: 'Container registry host.'
+    required: false
+    default: 'ghcr.io'
+  registry_username:
+    description: 'Username for registry login.'
+    required: false
+    default: ''
+  registry_password:
+    description: 'Password or token for registry login.'
+    required: false
+    default: ''
+  skip_sast:
+    description: 'Skip the SAST step.'
+    required: false
+    default: 'false'
+  skip_sca:
+    description: 'Skip the SCA step.'
+    required: false
+    default: 'false'
+  skip_lint:
+    description: 'Skip the hadolint step.'
+    required: false
+    default: 'false'
+  skip_build:
+    description: 'Skip the Docker build step.'
+    required: false
+    default: 'false'
+  tests_path:
+    description: 'Command or script to run inside the container for testing. Defaults to a smoke test.'
+    required: false
+    default: ''
+  skip_test:
+    description: 'Skip the container smoke test step.'
+    required: false
+    default: 'false'
+  skip_versioning:
+    description: 'Skip the versioning step.'
+    required: false
+    default: 'false'
+  skip_packaging:
+    description: 'Skip the packaging (image tagging) step.'
+    required: false
+    default: 'false'
+  skip_release:
+    description: 'Skip the release (registry push) step.'
+    required: false
+    default: 'false'
+  skip_reintegration:
+    description: 'Skip the reintegration step.'
+    required: false
+    default: 'false'
+  version_bump:
+    description: 'Version bump type: patch, minor, or major.'
+    required: false
+    default: 'patch'
+  github_token:
+    description: 'GitHub token for reintegration.'
+    required: false
+    default: ''
+  log_file:
+    description: 'Path to the JSONL log file.'
+    required: false
+    default: 'pipery.jsonl'
+  build_args:
+    description: 'Comma-separated list of build args in VAR=val format.'
+    required: false
+    default: ''
+  platforms:
+    description: 'Platforms to build for.'
+    required: false
+    default: 'linux/amd64'
+
 runs:
   using: composite
   steps:
-    - id: main
+    - id: setup-psh
+      name: Setup psh
+      shell: bash
+      run: ${{ github.action_path }}/src/setup-psh.sh
+      env:
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: install-pipery-tooling
+      name: Install pipery-tooling
       shell: bash
       run: |
-        set -euo pipefail
-        project_path="${INPUT_PROJECT_PATH:-${PIPERY_TEST_PROJECT_PATH:-.}}"
-        log_path="${PIPERY_LOG_PATH:-pipery.jsonl}"
-        if [ ! -d "$project_path" ]; then
-          echo "Expected project path to exist: $project_path" >&2
-          exit 1
+        if ! command -v pipery-steps &>/dev/null; then
+          pip install pipery-tooling --quiet 2>/dev/null || true
         fi
-        printf '{"event":"build","status":"success","project_path":"%s"}\n' "$project_path" > "$log_path"
-        echo "Implement your action logic here for $project_path."
+
+    - id: lint
+      name: Lint (hadolint)
+      if: ${{ inputs.skip_lint != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-lint.sh
+      env:
+        INPUT_PROJECT_PATH: ${{ inputs.project_path }}
+        INPUT_DOCKERFILE: ${{ inputs.dockerfile }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: sast
+      name: SAST
+      if: ${{ inputs.skip_sast != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-sast.sh
+      env:
+        INPUT_PROJECT_PATH: ${{ inputs.project_path }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: sca
+      name: SCA
+      if: ${{ inputs.skip_sca != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-sca.sh
+      env:
+        INPUT_PROJECT_PATH: ${{ inputs.project_path }}
+        INPUT_IMAGE_NAME: ${{ inputs.image_name }}
+        INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: build
+      name: Build
+      if: ${{ inputs.skip_build != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-build.sh
+      env:
+        INPUT_PROJECT_PATH: ${{ inputs.project_path }}
+        INPUT_DOCKERFILE: ${{ inputs.dockerfile }}
+        INPUT_IMAGE_NAME: ${{ inputs.image_name }}
+        INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_BUILD_ARGS: ${{ inputs.build_args }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: test
+      name: Test
+      if: ${{ inputs.skip_test != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-test.sh
+      env:
+        INPUT_IMAGE_NAME: ${{ inputs.image_name }}
+        INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_TESTS_PATH: ${{ inputs.tests_path }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: versioning
+      name: Versioning
+      if: ${{ inputs.skip_versioning != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-version.sh
+      env:
+        INPUT_PROJECT_PATH: ${{ inputs.project_path }}
+        INPUT_VERSION_BUMP: ${{ inputs.version_bump }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: packaging
+      name: Packaging
+      if: ${{ inputs.skip_packaging != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-package.sh
+      env:
+        INPUT_IMAGE_NAME: ${{ inputs.image_name }}
+        INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_VERSION: ${{ steps.versioning.outputs.version }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: release
+      name: Release
+      if: ${{ inputs.skip_release != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-release.sh
+      env:
+        INPUT_REGISTRY: ${{ inputs.registry }}
+        INPUT_REGISTRY_USERNAME: ${{ inputs.registry_username }}
+        INPUT_REGISTRY_PASSWORD: ${{ inputs.registry_password }}
+        INPUT_IMAGE_NAME: ${{ inputs.image_name }}
+        INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_VERSION: ${{ steps.versioning.outputs.version }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+        GITHUB_SHA: ${{ github.sha }}
+
+    - id: reintegration
+      name: Reintegration
+      if: ${{ inputs.skip_reintegration != 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/src/step-reintegrate.sh
+      env:
+        INPUT_PROJECT_PATH: ${{ inputs.project_path }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
+    - id: main
+      name: Finalize
+      shell: bash
+      run: ${{ github.action_path }}/src/main.sh
+      if: always()
+      env:
+        INPUT_PROJECT_PATH: ${{ inputs.project_path }}
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+        PIPERY_CI_STATUS: ${{ job.status }}
+
+    - id: upload-logs
+      name: Upload logs
+      if: always()
+      shell: bash
+      run: |
+        log="${INPUT_LOG_FILE:-pipery.jsonl}"
+        if [ -f "$log" ]; then
+          echo "Build log ($log):"
+          cat "$log"
+        fi
+      env:
+        INPUT_LOG_FILE: ${{ inputs.log_file }}
+
 branding:
-  icon: package
+  icon: anchor
   color: blue
