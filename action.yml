@@ -236,5 +236,5 @@ runs:
         INPUT_LOG_FILE: ${{ inputs.log_file }}
 
 branding:
-  icon: package
+  icon: anchor
   color: blue

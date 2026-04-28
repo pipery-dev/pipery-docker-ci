@@ -24,8 +24,10 @@ echo "Logging in to registry: $REGISTRY..."
 echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
 
 docker push "${IMAGE_NAME}:${IMAGE_TAG}"
-docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}:sha-${SHORT_SHA}"
-docker push "${IMAGE_NAME}:sha-${SHORT_SHA}"
+if [ -n "${SHORT_SHA}" ]; then
+  docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}:sha-${SHORT_SHA}"
+  docker push "${IMAGE_NAME}:sha-${SHORT_SHA}"
+fi
 
 if [ -n "$VERSION" ]; then
   MINOR="$(echo "$VERSION" | cut -d. -f1-2)"
