@@ -9,8 +9,6 @@ All notable changes to this project will be documented in this file.
 ### Added
 - GitHub Marketplace branding icon updated to match action technology (Feather icon set)
 - Added `simple_icon` field to `pipery-action.toml` for technology icon reference (Simple Icons slug)
-
-### Added
 - `tests_path` input: configures the command or script run inside the container during the test step
 - Short git hash (`sha-<7chars>`) included in every release alongside semver tags
 
