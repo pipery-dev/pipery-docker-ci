@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pipery-dev/pipery-docker-ci@v0
+      - uses: pipery-dev/pipery-docker-ci@v1
         with:
           project_path: .
 ```
