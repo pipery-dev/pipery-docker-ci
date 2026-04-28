@@ -1,4 +1,4 @@
-# <img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/anchor.svg" width="28" align="center" /> Pipery Docker CI
+# <img src="https://raw.githubusercontent.com/pipery-dev/pipery-docker-ci/main/assets/icon.png" width="28" align="center" /> Pipery Docker CI
 
 Reusable GitHub Action for a complete Docker CI pipeline with structured logging via [Pipery](https://pipery.dev).
 
@@ -69,7 +69,7 @@ jobs:
 
 ## About Pipery
 
-<img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/zap.svg" width="18" align="center" /> [**Pipery**](https://pipery.dev) is an open-source CI/CD observability platform. Every step script runs under **psh** (Pipery Shell), which intercepts all commands and emits structured JSONL events — giving you full visibility into your pipeline without any manual instrumentation.
+<img src="https://avatars.githubusercontent.com/u/270923927?s=32" width="22" align="center" /> [**Pipery**](https://pipery.dev) is an open-source CI/CD observability platform. Every step script runs under **psh** (Pipery Shell), which intercepts all commands and emits structured JSONL events — giving you full visibility into your pipeline without any manual instrumentation.
 
 - Browse logs in the [Pipery Dashboard](https://github.com/pipery-dev/pipery-dashboard)
 - Find all Pipery actions on [GitHub Marketplace](https://github.com/marketplace?q=pipery&type=actions)
