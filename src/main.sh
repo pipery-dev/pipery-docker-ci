@@ -15,6 +15,8 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ] || [ -n "${PIPERY_TEST_PROJECT_PATH:-}" ]
   export INPUT_LOG_FILE="$LOG"
   export INPUT_PROJECT_PATH="$PROJECT_PATH"
 
+  "$SCRIPT_DIR/setup-psh.sh"
+
   if [ "${INPUT_SKIP_LINT:-false}" != "true" ]; then
     "$SCRIPT_DIR/step-lint.sh"
   fi
