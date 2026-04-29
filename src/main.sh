@@ -15,7 +15,12 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ] || [ -n "${PIPERY_TEST_PROJECT_PATH:-}" ]
   export INPUT_LOG_FILE="$LOG"
   export INPUT_PROJECT_PATH="$PROJECT_PATH"
 
-  "$SCRIPT_DIR/setup-psh.sh"
+  # In test mode use a bash wrapper for psh; the real psh binary has a Go runtime
+  # incompatibility (newosproc) with the GitHub Actions runner seccomp profile.
+  mkdir -p /tmp/pipery-test-bin
+  printf '#!/bin/bash\nexec bash "$@"\n' > /tmp/pipery-test-bin/psh
+  chmod +x /tmp/pipery-test-bin/psh
+  export PATH="/tmp/pipery-test-bin:$PATH"
 
   if [ "${INPUT_SKIP_LINT:-false}" != "true" ]; then
     "$SCRIPT_DIR/step-lint.sh"
