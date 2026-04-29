@@ -11,7 +11,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+if [ "${GITHUB_ACTIONS:-}" != "true" ] || [ -n "${PIPERY_TEST_PROJECT_PATH:-}" ]; then
   export INPUT_LOG_FILE="$LOG"
   export INPUT_PROJECT_PATH="$PROJECT_PATH"
 
