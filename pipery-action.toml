@@ -18,9 +18,141 @@ cleanup_paths = ["pipery.jsonl"]
 
 [[inputs]]
 name = "project_path"
-description = "Path to the project source tree the action should operate on."
+description = "Path to the project source tree."
 required = false
 default = "."
+
+[[inputs]]
+name = "config_file"
+description = "Path to a config file for the action."
+required = false
+default = ""
+
+[[inputs]]
+name = "dockerfile"
+description = "Dockerfile name relative to project_path."
+required = false
+default = "Dockerfile"
+
+[[inputs]]
+name = "image_name"
+description = "Name of the Docker image to build."
+required = false
+default = ""
+
+[[inputs]]
+name = "image_tag"
+description = "Tag for the Docker image."
+required = false
+default = "latest"
+
+[[inputs]]
+name = "registry"
+description = "Container registry host."
+required = false
+default = "ghcr.io"
+
+[[inputs]]
+name = "registry_username"
+description = "Username for registry login."
+required = false
+default = ""
+
+[[inputs]]
+name = "registry_password"
+description = "Password or token for registry login."
+required = false
+default = ""
+
+[[inputs]]
+name = "skip_sast"
+description = "Skip the SAST step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "skip_sca"
+description = "Skip the SCA step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "skip_lint"
+description = "Skip the hadolint step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "skip_build"
+description = "Skip the Docker build step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "tests_path"
+description = "Command or script to run inside the container for testing. Defaults to a smoke test."
+required = false
+default = ""
+
+[[inputs]]
+name = "skip_test"
+description = "Skip the container smoke test step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "skip_versioning"
+description = "Skip the versioning step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "skip_packaging"
+description = "Skip the packaging (image tagging) step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "skip_release"
+description = "Skip the release (registry push) step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "skip_reintegration"
+description = "Skip the reintegration step."
+required = false
+default = "false"
+
+[[inputs]]
+name = "version_bump"
+description = "Version bump type: patch, minor, or major."
+required = false
+default = "patch"
+
+[[inputs]]
+name = "github_token"
+description = "GitHub token for reintegration."
+required = false
+default = ""
+
+[[inputs]]
+name = "log_file"
+description = "Path to the JSONL log file."
+required = false
+default = "pipery.jsonl"
+
+[[inputs]]
+name = "build_args"
+description = "Comma-separated list of build args in VAR=val format."
+required = false
+default = ""
+
+[[inputs]]
+name = "platforms"
+description = "Platforms to build for."
+required = false
+default = "linux/amd64"
 
 [[test_log_required_fields]]
 name = "event"
