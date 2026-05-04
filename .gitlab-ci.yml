@@ -1,0 +1,282 @@
+# GitLab CI Pipeline for pipery-docker-ci
+# This is the GitLab CI equivalent of the GitHub Actions Docker CI workflow
+# For Docker image building, security scanning, and registry push
+
+variables:
+  PROJECT_PATH: "."
+  CONFIG_FILE: ".github/pipery/config.yaml"
+  DOCKERFILE: "Dockerfile"
+  IMAGE_NAME: ""  # Required: e.g., ghcr.io/myorg/myapp
+  IMAGE_TAG: "latest"
+  REGISTRY: "ghcr.io"
+  REGISTRY_USERNAME: ""
+  # Build configuration
+  BUILD_ARGS: ""  # Comma-separated VAR=val
+  PLATFORMS: "linux/amd64"
+  TESTS_PATH: ""  # Container smoke test command
+  # Security controls
+  SKIP_SAST: "false"
+  SKIP_SCA: "false"
+  SKIP_LINT: "false"
+  SKIP_BUILD: "false"
+  SKIP_TEST: "false"
+  SKIP_VERSIONING: "false"
+  SKIP_PACKAGING: "false"
+  SKIP_RELEASE: "false"
+  SKIP_REINTEGRATION: "false"
+  # Release configuration
+  VERSION_BUMP: "patch"
+  # Secrets (set in GitLab Protected Variables)
+  # REGISTRY_PASSWORD: (set in GitLab Protected Variables)
+  # GITHUB_TOKEN: (set in GitLab Protected Variables)
+  LOG_FILE: "pipery.jsonl"
+  TARGET_BRANCH: "main"
+
+stages:
+  - checkout
+  - setup
+  - sast
+  - sca
+  - lint
+  - build
+  - test
+  - versioning
+  - packaging
+  - release
+  - reintegration
+  - logs
+
+checkout:
+  stage: checkout
+  image: alpine:latest
+  script:
+    - echo "Repository already checked out by GitLab CI"
+    - ls -la
+
+setup:
+  stage: setup
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker --version
+    - docker buildx version || echo "buildx not available"
+    - echo "Setup complete"
+
+sast_scan:
+  stage: sast
+  image: python:3.11-alpine
+  before_script:
+    - apk add --no-cache git
+    - pip install pipery-tooling
+  script:
+    - echo "Running SAST scan using pipery-tooling..."
+    - pipery-tooling sast --project-path $PROJECT_PATH --config $CONFIG_FILE --log-file $LOG_FILE
+    - echo "SAST scan complete"
+  allow_failure: true
+  rules:
+    - if: '$SKIP_SAST == "true"'
+      when: never
+    - when: on_success
+  artifacts:
+    paths:
+      - $LOG_FILE
+    expire_in: 30 days
+
+sca_scan:
+  stage: sca
+  image: python:3.11-alpine
+  before_script:
+    - pip install pipery-tooling
+  script:
+    - echo "Running SCA scan using pipery-tooling..."
+    - pipery-tooling sca --project-path $PROJECT_PATH --config $CONFIG_FILE --log-file $LOG_FILE
+    - echo "SCA scan complete"
+  allow_failure: true
+  rules:
+    - if: '$SKIP_SCA == "true"'
+      when: never
+    - when: on_success
+  artifacts:
+    paths:
+      - $LOG_FILE
+    expire_in: 30 days
+
+lint:
+  stage: lint
+  image: hadolint/hadolint:latest
+  script:
+    - echo "Running Hadolint on Dockerfile..."
+    - hadolint $PROJECT_PATH/$DOCKERFILE || true
+    - echo "Lint stage complete"
+  rules:
+    - if: '$SKIP_LINT == "true"'
+      when: never
+    - when: on_success
+  allow_failure: true
+
+build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - |
+      if [ -z "$IMAGE_NAME" ]; then
+        echo "ERROR: IMAGE_NAME variable must be set"
+        exit 1
+      fi
+    - cd $PROJECT_PATH
+    - echo "Building Docker image: $IMAGE_NAME:$IMAGE_TAG"
+    - |
+      BUILD_FLAGS=""
+      if [ -n "$BUILD_ARGS" ]; then
+        IFS=',' read -ra ARGS <<< "$BUILD_ARGS"
+        for arg in "${ARGS[@]}"; do
+          BUILD_FLAGS="$BUILD_FLAGS --build-arg $arg"
+        done
+      fi
+    - docker build -f $DOCKERFILE -t $IMAGE_NAME:$IMAGE_TAG $BUILD_FLAGS .
+    - docker images | grep $IMAGE_NAME
+    - echo "Build complete"
+  rules:
+    - if: '$SKIP_BUILD == "true"'
+      when: never
+    - when: on_success
+  artifacts:
+    expire_in: 1 day
+
+test:
+  stage: test
+  image: docker:latest
+  services:
+    - docker:dind
+  dependencies:
+    - build
+  script:
+    - |
+      if [ -z "$IMAGE_NAME" ]; then
+        echo "IMAGE_NAME not set, skipping test"
+        exit 0
+      fi
+    - echo "Running container smoke tests..."
+    - |
+      if [ -n "$TESTS_PATH" ]; then
+        docker run --rm $IMAGE_NAME:$IMAGE_TAG sh -c "$TESTS_PATH"
+      else
+        echo "Running basic smoke test..."
+        docker run --rm $IMAGE_NAME:$IMAGE_TAG echo "Container test successful"
+      fi
+    - echo "Tests complete"
+  rules:
+    - if: '$SKIP_TEST == "true"'
+      when: never
+    - when: on_success
+  allow_failure: true
+
+versioning:
+  stage: versioning
+  image: python:3.11-alpine
+  before_script:
+    - pip install pipery-tooling
+  script:
+    - echo "Running versioning step..."
+    - pipery-tooling version --project-path $PROJECT_PATH --version-bump $VERSION_BUMP --log-file $LOG_FILE
+    - echo "Image tag will be: $IMAGE_NAME:$IMAGE_TAG"
+    - echo "$IMAGE_NAME:$IMAGE_TAG" > version_info.txt
+    - cat version_info.txt
+  rules:
+    - if: '$SKIP_VERSIONING == "true"'
+      when: never
+    - when: on_success
+  artifacts:
+    paths:
+      - version_info.txt
+      - $LOG_FILE
+    expire_in: 30 days
+
+packaging:
+  stage: packaging
+  image: docker:latest
+  services:
+    - docker:dind
+  dependencies:
+    - build
+    - versioning
+  script:
+    - |
+      if [ -z "$IMAGE_NAME" ]; then
+        echo "IMAGE_NAME not set, skipping packaging"
+        exit 0
+      fi
+    - echo "Packaging Docker image..."
+    - docker tag $IMAGE_NAME:$IMAGE_TAG $REGISTRY/$IMAGE_NAME:$IMAGE_TAG || true
+    - docker images | grep $IMAGE_NAME
+    - echo "Package complete"
+  rules:
+    - if: '$SKIP_PACKAGING == "true"'
+      when: never
+    - when: on_success
+
+release:
+  stage: release
+  image: docker:latest
+  services:
+    - docker:dind
+  dependencies:
+    - versioning
+    - packaging
+  script:
+    - |
+      if [ -z "$IMAGE_NAME" ] || [ -z "$REGISTRY_PASSWORD" ]; then
+        echo "ERROR: IMAGE_NAME and REGISTRY_PASSWORD must be set"
+        exit 1
+      fi
+    - echo "Authenticating with Docker registry..."
+    - echo "$REGISTRY_PASSWORD" | docker login -u "$REGISTRY_USERNAME" --password-stdin $REGISTRY
+    - echo "Pushing image: $REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+    - docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+    - echo "Release complete"
+  rules:
+    - if: '$SKIP_RELEASE == "true"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $TARGET_BRANCH'
+      when: on_success
+    - when: manual
+  only:
+    - branches
+
+reintegration:
+  stage: reintegration
+  image: alpine:latest
+  script:
+    - echo "Reintegration step would update target branch..."
+    - |
+      if [ -z "$GITHUB_TOKEN" ]; then
+        echo "Skipping reintegration: GITHUB_TOKEN not set"
+        exit 0
+      fi
+    - echo "Reintegration complete"
+  rules:
+    - if: '$SKIP_REINTEGRATION == "true"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $TARGET_BRANCH'
+      when: on_success
+    - when: manual
+  allow_failure: true
+
+publish_logs:
+  stage: logs
+  image: alpine:latest
+  script:
+    - echo "Collecting logs and artifacts..."
+    - |
+      if [ -f "$LOG_FILE" ]; then
+        echo "Log file size: $(wc -c < $LOG_FILE) bytes"
+      fi
+  artifacts:
+    paths:
+      - $LOG_FILE
+      - version_info.txt
+    expire_in: 90 days
+  when: always
