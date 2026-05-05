@@ -4,7 +4,7 @@
 
 variables:
   PROJECT_PATH: "."
-  CONFIG_FILE: ".github/pipery/config.yaml"
+  CONFIG_FILE: ".pipery/config.yaml"
   DOCKERFILE: "Dockerfile"
   IMAGE_NAME: ""  # Required: e.g., ghcr.io/myorg/myapp
   IMAGE_TAG: "latest"
