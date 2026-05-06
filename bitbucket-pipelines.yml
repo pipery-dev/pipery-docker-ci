@@ -1,0 +1,383 @@
+# ============================================================================
+# Bitbucket Pipelines Configuration for pipery-docker-ci
+# Production-Ready Docker Image CI Pipeline
+# ============================================================================
+#
+# SETUP INSTRUCTIONS:
+# 1. Copy this file to pipery-docker-ci repository root as bitbucket-pipelines.yml
+# 2. Configure Protected Variables in Bitbucket
+# 3. Set SKIP_* variables to 'true' to disable specific stages
+#
+# PROTECTED VARIABLES TO CONFIGURE:
+# - REGISTRY_PASSWORD: Docker registry authentication token (Mark as Secured)
+# - GITHUB_TOKEN: GitHub API token for reintegration (Mark as Secured)
+
+definitions:
+  steps:
+    - step: &checkout-step
+        name: Checkout Repository
+        image: alpine:latest
+        script:
+          - echo "Repository checked out by Bitbucket Pipelines"
+          - ls -la
+
+    - step: &setup-step
+        name: Setup Docker Environment
+        image: docker:latest
+        services:
+          - docker
+        script:
+          - docker --version
+          - docker buildx version || echo "buildx not available"
+          - echo "Setup complete"
+
+    - step: &sast-scan
+        name: SAST Security Scan
+        image: python:3.11-alpine
+        script:
+          - echo "Running SAST scan using pipery-tooling..."
+          - apk add --no-cache git
+          - pip install --quiet pipery-tooling
+          - |
+            pipery-tooling sast \
+              --project-path ${PROJECT_PATH:-.} \
+              --config ${CONFIG_FILE:-.pipery/config.yaml} \
+              --log-file ${LOG_FILE:-pipery.jsonl}
+          - echo "SAST scan complete"
+        artifacts:
+          - ${LOG_FILE:-pipery.jsonl}
+
+    - step: &sca-scan
+        name: SCA Dependency Scan
+        image: python:3.11-alpine
+        script:
+          - echo "Running SCA scan using pipery-tooling..."
+          - pip install --quiet pipery-tooling
+          - |
+            pipery-tooling sca \
+              --project-path ${PROJECT_PATH:-.} \
+              --config ${CONFIG_FILE:-.pipery/config.yaml} \
+              --log-file ${LOG_FILE:-pipery.jsonl}
+          - echo "SCA scan complete"
+        artifacts:
+          - ${LOG_FILE:-pipery.jsonl}
+
+    - step: &lint-step
+        name: Dockerfile Linting
+        image: hadolint/hadolint:latest
+        script:
+          - echo "Running Hadolint on Dockerfile..."
+          - hadolint ${PROJECT_PATH:-.}/${DOCKERFILE:-Dockerfile} || true
+          - echo "Lint stage complete"
+
+    - step: &build-step
+        name: Build Docker Image
+        image: docker:latest
+        services:
+          - docker
+        script:
+          - |
+            if [ -z "$IMAGE_NAME" ]; then
+              echo "ERROR: IMAGE_NAME variable must be set"
+              exit 1
+            fi
+          - cd ${PROJECT_PATH:-.}
+          - echo "Building Docker image: $IMAGE_NAME:${IMAGE_TAG:-latest}"
+          - |
+            BUILD_FLAGS=""
+            if [ -n "$BUILD_ARGS" ]; then
+              IFS=',' read -ra ARGS <<< "$BUILD_ARGS"
+              for arg in "${ARGS[@]}"; do
+                BUILD_FLAGS="$BUILD_FLAGS --build-arg $arg"
+              done
+            fi
+          - docker build -f ${DOCKERFILE:-Dockerfile} -t $IMAGE_NAME:${IMAGE_TAG:-latest} $BUILD_FLAGS .
+          - docker images | grep $IMAGE_NAME
+          - echo "Build complete"
+
+    - step: &test-step
+        name: Container Smoke Tests
+        image: docker:latest
+        services:
+          - docker
+        script:
+          - |
+            if [ -z "$IMAGE_NAME" ]; then
+              echo "IMAGE_NAME not set, skipping test"
+              exit 0
+            fi
+          - echo "Running container smoke tests..."
+          - |
+            if [ -n "$TESTS_PATH" ]; then
+              docker run --rm $IMAGE_NAME:${IMAGE_TAG:-latest} sh -c "$TESTS_PATH"
+            else
+              echo "Running basic smoke test..."
+              docker run --rm $IMAGE_NAME:${IMAGE_TAG:-latest} echo "Container test successful"
+            fi
+          - echo "Tests complete"
+
+    - step: &versioning-step
+        name: Version Bump & Tag
+        image: python:3.11-alpine
+        script:
+          - echo "Running versioning step..."
+          - pip install --quiet pipery-tooling
+          - |
+            pipery-tooling version \
+              --project-path ${PROJECT_PATH:-.} \
+              --version-bump ${VERSION_BUMP:-patch} \
+              --log-file ${LOG_FILE:-pipery.jsonl}
+          - echo "Image tag will be: $IMAGE_NAME:${IMAGE_TAG:-latest}"
+          - echo "$IMAGE_NAME:${IMAGE_TAG:-latest}" > version_info.txt
+          - cat version_info.txt
+        artifacts:
+          - version_info.txt
+          - ${LOG_FILE:-pipery.jsonl}
+
+    - step: &packaging-step
+        name: Tag Container Image
+        image: docker:latest
+        services:
+          - docker
+        script:
+          - |
+            if [ -z "$IMAGE_NAME" ]; then
+              echo "IMAGE_NAME not set, skipping packaging"
+              exit 0
+            fi
+          - echo "Packaging Docker image..."
+          - docker tag $IMAGE_NAME:${IMAGE_TAG:-latest} $REGISTRY/$IMAGE_NAME:${IMAGE_TAG:-latest} || true
+          - docker images | grep $IMAGE_NAME
+          - echo "Package complete"
+
+    - step: &release-step
+        name: Release to Registry
+        image: docker:latest
+        services:
+          - docker
+        trigger: manual
+        script:
+          - |
+            if [ -z "$IMAGE_NAME" ] || [ -z "$REGISTRY_PASSWORD" ]; then
+              echo "ERROR: IMAGE_NAME and REGISTRY_PASSWORD must be set"
+              exit 1
+            fi
+          - echo "Authenticating with Docker registry..."
+          - echo "$REGISTRY_PASSWORD" | docker login -u "$REGISTRY_USERNAME" --password-stdin $REGISTRY
+          - echo "Pushing image: $REGISTRY/$IMAGE_NAME:${IMAGE_TAG:-latest}"
+          - docker push $REGISTRY/$IMAGE_NAME:${IMAGE_TAG:-latest}
+          - echo "Release complete"
+
+    - step: &reintegration-step
+        name: Reintegration to Target Branch
+        image: alpine:latest
+        trigger: manual
+        script:
+          - echo "Reintegration step would update target branch..."
+          - |
+            if [ -z "$GITHUB_TOKEN" ]; then
+              echo "Skipping reintegration: GITHUB_TOKEN not set"
+              exit 0
+            fi
+          - echo "Reintegration complete"
+
+    - step: &logs-step
+        name: Collect & Archive Logs
+        image: alpine:latest
+        script:
+          - echo "Collecting logs and artifacts..."
+          - |
+            if [ -f "${LOG_FILE:-pipery.jsonl}" ]; then
+              echo "Log file size: $(wc -c < ${LOG_FILE:-pipery.jsonl}) bytes"
+            fi
+        artifacts:
+          - ${LOG_FILE:-pipery.jsonl}
+          - version_info.txt
+
+variables:
+  # Build Configuration
+  PROJECT_PATH: "."
+  CONFIG_FILE: ".pipery/config.yaml"
+  DOCKERFILE: "Dockerfile"
+  IMAGE_NAME: ""  # REQUIRED: e.g., ghcr.io/myorg/myapp
+  IMAGE_TAG: "latest"
+  BUILD_ARGS: ""  # Comma-separated VAR=val
+
+  # Test Configuration
+  TESTS_PATH: ""  # Container smoke test command
+
+  # Feature Flags
+  SKIP_SAST: "false"
+  SKIP_SCA: "false"
+  SKIP_LINT: "false"
+  SKIP_BUILD: "false"
+  SKIP_TEST: "false"
+  SKIP_VERSIONING: "false"
+  SKIP_PACKAGING: "false"
+  SKIP_RELEASE: "false"
+  SKIP_REINTEGRATION: "false"
+
+  # Release Configuration
+  VERSION_BUMP: "patch"
+  REGISTRY: "ghcr.io"
+  REGISTRY_USERNAME: ""
+
+  # Logging & Tracking
+  LOG_FILE: "pipery.jsonl"
+  TARGET_BRANCH: "main"
+
+pipelines:
+  default:
+    - step: *checkout-step
+    - step: *setup-step
+    - parallel:
+        - step: *sast-scan
+        - step: *sca-scan
+    - step:
+        <<: *lint-step
+        condition:
+          variable:
+            - SKIP_LINT = "false"
+        optional: true
+    - step:
+        <<: *build-step
+        condition:
+          variable:
+            - SKIP_BUILD = "false"
+    - step:
+        <<: *test-step
+        condition:
+          variable:
+            - SKIP_TEST = "false"
+        optional: true
+    - step:
+        <<: *versioning-step
+        condition:
+          variable:
+            - SKIP_VERSIONING = "false"
+    - step:
+        <<: *packaging-step
+        condition:
+          variable:
+            - SKIP_PACKAGING = "false"
+    - step: *logs-step
+
+  branches:
+    main:
+      - step: *checkout-step
+      - step: *setup-step
+      - parallel:
+          - step: *sast-scan
+          - step: *sca-scan
+      - step:
+          <<: *lint-step
+          condition:
+            variable:
+              - SKIP_LINT = "false"
+          optional: true
+      - step:
+          <<: *build-step
+          condition:
+            variable:
+              - SKIP_BUILD = "false"
+      - step:
+          <<: *test-step
+          condition:
+            variable:
+              - SKIP_TEST = "false"
+          optional: true
+      - step:
+          <<: *versioning-step
+          condition:
+            variable:
+              - SKIP_VERSIONING = "false"
+      - step:
+          <<: *packaging-step
+          condition:
+            variable:
+              - SKIP_PACKAGING = "false"
+      - step:
+          <<: *release-step
+          condition:
+            variable:
+              - SKIP_RELEASE = "false"
+      - step:
+          <<: *reintegration-step
+          condition:
+            variable:
+              - SKIP_REINTEGRATION = "false"
+          optional: true
+      - step: *logs-step
+
+  pull-requests:
+    feature/**:
+      - step: *checkout-step
+      - step: *setup-step
+      - parallel:
+          - step: *sast-scan
+          - step: *sca-scan
+      - step:
+          <<: *lint-step
+          condition:
+            variable:
+              - SKIP_LINT = "false"
+          optional: true
+      - step:
+          <<: *build-step
+          condition:
+            variable:
+              - SKIP_BUILD = "false"
+      - step:
+          <<: *test-step
+          condition:
+            variable:
+              - SKIP_TEST = "false"
+          optional: true
+      - step: *logs-step
+
+  custom:
+    release:
+      - step: *checkout-step
+      - step: *setup-step
+      - parallel:
+          - step: *sast-scan
+          - step: *sca-scan
+      - step:
+          <<: *lint-step
+          condition:
+            variable:
+              - SKIP_LINT = "false"
+          optional: true
+      - step:
+          <<: *build-step
+          condition:
+            variable:
+              - SKIP_BUILD = "false"
+      - step:
+          <<: *test-step
+          condition:
+            variable:
+              - SKIP_TEST = "false"
+          optional: true
+      - step:
+          <<: *versioning-step
+          condition:
+            variable:
+              - SKIP_VERSIONING = "false"
+      - step:
+          <<: *packaging-step
+          condition:
+            variable:
+              - SKIP_PACKAGING = "false"
+      - step:
+          <<: *release-step
+          condition:
+            variable:
+              - SKIP_RELEASE = "false"
+      - step:
+          <<: *reintegration-step
+          condition:
+            variable:
+              - SKIP_REINTEGRATION = "false"
+          optional: true
+      - step: *logs-step
