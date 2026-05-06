@@ -27,23 +27,20 @@ definitions:
         services:
           - docker
         script:
-          - docker --version
-          - docker buildx version || echo "buildx not available"
-          - echo "Setup complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/setup-psh.sh
+        env:
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
 
     - step: &sast-scan
         name: SAST Security Scan
         image: python:3.11-alpine
         script:
-          - echo "Running SAST scan using pipery-tooling..."
-          - apk add --no-cache git
-          - pip install --quiet pipery-tooling
-          - |
-            pipery-tooling sast \
-              --project-path ${PROJECT_PATH:-.} \
-              --config ${CONFIG_FILE:-.pipery/config.yaml} \
-              --log-file ${LOG_FILE:-pipery.jsonl}
-          - echo "SAST scan complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-sast.sh
+        env:
+          INPUT_PROJECT_PATH: ${PROJECT_PATH:-.}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
         artifacts:
           - ${LOG_FILE:-pipery.jsonl}
 
@@ -51,14 +48,13 @@ definitions:
         name: SCA Dependency Scan
         image: python:3.11-alpine
         script:
-          - echo "Running SCA scan using pipery-tooling..."
-          - pip install --quiet pipery-tooling
-          - |
-            pipery-tooling sca \
-              --project-path ${PROJECT_PATH:-.} \
-              --config ${CONFIG_FILE:-.pipery/config.yaml} \
-              --log-file ${LOG_FILE:-pipery.jsonl}
-          - echo "SCA scan complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-sca.sh
+        env:
+          INPUT_PROJECT_PATH: ${PROJECT_PATH:-.}
+          INPUT_IMAGE_NAME: ${IMAGE_NAME}
+          INPUT_IMAGE_TAG: ${IMAGE_TAG:-latest}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
         artifacts:
           - ${LOG_FILE:-pipery.jsonl}
 
@@ -66,9 +62,12 @@ definitions:
         name: Dockerfile Linting
         image: hadolint/hadolint:latest
         script:
-          - echo "Running Hadolint on Dockerfile..."
-          - hadolint ${PROJECT_PATH:-.}/${DOCKERFILE:-Dockerfile} || true
-          - echo "Lint stage complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-lint.sh
+        env:
+          INPUT_PROJECT_PATH: ${PROJECT_PATH:-.}
+          INPUT_DOCKERFILE: ${DOCKERFILE:-Dockerfile}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
 
     - step: &build-step
         name: Build Docker Image
@@ -76,24 +75,15 @@ definitions:
         services:
           - docker
         script:
-          - |
-            if [ -z "$IMAGE_NAME" ]; then
-              echo "ERROR: IMAGE_NAME variable must be set"
-              exit 1
-            fi
-          - cd ${PROJECT_PATH:-.}
-          - echo "Building Docker image: $IMAGE_NAME:${IMAGE_TAG:-latest}"
-          - |
-            BUILD_FLAGS=""
-            if [ -n "$BUILD_ARGS" ]; then
-              IFS=',' read -ra ARGS <<< "$BUILD_ARGS"
-              for arg in "${ARGS[@]}"; do
-                BUILD_FLAGS="$BUILD_FLAGS --build-arg $arg"
-              done
-            fi
-          - docker build -f ${DOCKERFILE:-Dockerfile} -t $IMAGE_NAME:${IMAGE_TAG:-latest} $BUILD_FLAGS .
-          - docker images | grep $IMAGE_NAME
-          - echo "Build complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-build.sh
+        env:
+          INPUT_PROJECT_PATH: ${PROJECT_PATH:-.}
+          INPUT_DOCKERFILE: ${DOCKERFILE:-Dockerfile}
+          INPUT_IMAGE_NAME: ${IMAGE_NAME}
+          INPUT_IMAGE_TAG: ${IMAGE_TAG:-latest}
+          INPUT_BUILD_ARGS: ${BUILD_ARGS}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
 
     - step: &test-step
         name: Container Smoke Tests
@@ -101,35 +91,24 @@ definitions:
         services:
           - docker
         script:
-          - |
-            if [ -z "$IMAGE_NAME" ]; then
-              echo "IMAGE_NAME not set, skipping test"
-              exit 0
-            fi
-          - echo "Running container smoke tests..."
-          - |
-            if [ -n "$TESTS_PATH" ]; then
-              docker run --rm $IMAGE_NAME:${IMAGE_TAG:-latest} sh -c "$TESTS_PATH"
-            else
-              echo "Running basic smoke test..."
-              docker run --rm $IMAGE_NAME:${IMAGE_TAG:-latest} echo "Container test successful"
-            fi
-          - echo "Tests complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-test.sh
+        env:
+          INPUT_IMAGE_NAME: ${IMAGE_NAME}
+          INPUT_IMAGE_TAG: ${IMAGE_TAG:-latest}
+          INPUT_TESTS_PATH: ${TESTS_PATH}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
 
     - step: &versioning-step
         name: Version Bump & Tag
         image: python:3.11-alpine
         script:
-          - echo "Running versioning step..."
-          - pip install --quiet pipery-tooling
-          - |
-            pipery-tooling version \
-              --project-path ${PROJECT_PATH:-.} \
-              --version-bump ${VERSION_BUMP:-patch} \
-              --log-file ${LOG_FILE:-pipery.jsonl}
-          - echo "Image tag will be: $IMAGE_NAME:${IMAGE_TAG:-latest}"
-          - echo "$IMAGE_NAME:${IMAGE_TAG:-latest}" > version_info.txt
-          - cat version_info.txt
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-version.sh
+        env:
+          INPUT_PROJECT_PATH: ${PROJECT_PATH:-.}
+          INPUT_VERSION_BUMP: ${VERSION_BUMP:-patch}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
         artifacts:
           - version_info.txt
           - ${LOG_FILE:-pipery.jsonl}
@@ -140,15 +119,12 @@ definitions:
         services:
           - docker
         script:
-          - |
-            if [ -z "$IMAGE_NAME" ]; then
-              echo "IMAGE_NAME not set, skipping packaging"
-              exit 0
-            fi
-          - echo "Packaging Docker image..."
-          - docker tag $IMAGE_NAME:${IMAGE_TAG:-latest} $REGISTRY/$IMAGE_NAME:${IMAGE_TAG:-latest} || true
-          - docker images | grep $IMAGE_NAME
-          - echo "Package complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-package.sh
+        env:
+          INPUT_IMAGE_NAME: ${IMAGE_NAME}
+          INPUT_IMAGE_TAG: ${IMAGE_TAG:-latest}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
 
     - step: &release-step
         name: Release to Registry
@@ -157,29 +133,28 @@ definitions:
           - docker
         trigger: manual
         script:
-          - |
-            if [ -z "$IMAGE_NAME" ] || [ -z "$REGISTRY_PASSWORD" ]; then
-              echo "ERROR: IMAGE_NAME and REGISTRY_PASSWORD must be set"
-              exit 1
-            fi
-          - echo "Authenticating with Docker registry..."
-          - echo "$REGISTRY_PASSWORD" | docker login -u "$REGISTRY_USERNAME" --password-stdin $REGISTRY
-          - echo "Pushing image: $REGISTRY/$IMAGE_NAME:${IMAGE_TAG:-latest}"
-          - docker push $REGISTRY/$IMAGE_NAME:${IMAGE_TAG:-latest}
-          - echo "Release complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-release.sh
+        env:
+          INPUT_REGISTRY: ${REGISTRY:-ghcr.io}
+          INPUT_REGISTRY_USERNAME: ${REGISTRY_USERNAME}
+          INPUT_REGISTRY_PASSWORD: ${REGISTRY_PASSWORD}
+          INPUT_IMAGE_NAME: ${IMAGE_NAME}
+          INPUT_IMAGE_TAG: ${IMAGE_TAG:-latest}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
 
     - step: &reintegration-step
         name: Reintegration to Target Branch
         image: alpine:latest
         trigger: manual
         script:
-          - echo "Reintegration step would update target branch..."
-          - |
-            if [ -z "$GITHUB_TOKEN" ]; then
-              echo "Skipping reintegration: GITHUB_TOKEN not set"
-              exit 0
-            fi
-          - echo "Reintegration complete"
+          # Refactored: Call shared script instead of inline logic
+          - bash ./src/step-reintegrate.sh
+        env:
+          INPUT_PROJECT_PATH: ${PROJECT_PATH:-.}
+          INPUT_LOG_FILE: ${LOG_FILE:-pipery.jsonl}
+          INPUT_TARGET_BRANCH: ${TARGET_BRANCH:-main}
+          GITHUB_TOKEN: ${GITHUB_TOKEN}
 
     - step: &logs-step
         name: Collect & Archive Logs
