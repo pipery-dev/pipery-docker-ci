@@ -6,15 +6,14 @@ variables:
   PROJECT_PATH: "."
   CONFIG_FILE: ".pipery/config.yaml"
   DOCKERFILE: "Dockerfile"
-  IMAGE_NAME: ""  # Required: e.g., ghcr.io/myorg/myapp
+  IMAGE_NAME: ""
   IMAGE_TAG: "latest"
   REGISTRY: "ghcr.io"
   REGISTRY_USERNAME: ""
-  # Build configuration
-  BUILD_ARGS: ""  # Comma-separated VAR=val
+  REGISTRY_PASSWORD: ""
+  BUILD_ARGS: ""
   PLATFORMS: "linux/amd64"
-  TESTS_PATH: ""  # Container smoke test command
-  # Security controls
+  TESTS_PATH: ""
   SKIP_SAST: "false"
   SKIP_SCA: "false"
   SKIP_LINT: "false"
@@ -24,11 +23,8 @@ variables:
   SKIP_PACKAGING: "false"
   SKIP_RELEASE: "false"
   SKIP_REINTEGRATION: "false"
-  # Release configuration
   VERSION_BUMP: "patch"
-  # Secrets (set in GitLab Protected Variables)
-  # REGISTRY_PASSWORD: (set in GitLab Protected Variables)
-  # GITHUB_TOKEN: (set in GitLab Protected Variables)
+  GITHUB_TOKEN: ""
   LOG_FILE: "pipery.jsonl"
   TARGET_BRANCH: "main"
 
@@ -221,6 +217,7 @@ release:
     INPUT_IMAGE_NAME: $IMAGE_NAME
     INPUT_IMAGE_TAG: $IMAGE_TAG
     INPUT_LOG_FILE: $LOG_FILE
+    GITHUB_SHA: $CI_COMMIT_SHA
   rules:
     - if: '$SKIP_RELEASE == "true"'
       when: never
@@ -240,6 +237,7 @@ reintegration:
     INPUT_PROJECT_PATH: $PROJECT_PATH
     INPUT_LOG_FILE: $LOG_FILE
     INPUT_TARGET_BRANCH: $TARGET_BRANCH
+    INPUT_GITHUB_TOKEN: $GITHUB_TOKEN
     GITHUB_TOKEN: $GITHUB_TOKEN
   rules:
     - if: '$SKIP_REINTEGRATION == "true"'
