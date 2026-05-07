@@ -337,7 +337,7 @@ pipelines:
               - SKIP_REINTEGRATION = "false"
           optional: true
       - step: *logs-step
-    - step: *dashboard-link
+      - step: *dashboard-link
 
   pull-requests:
     feature/**:
@@ -364,7 +364,7 @@ pipelines:
               - SKIP_TEST = "false"
           optional: true
       - step: *logs-step
-    - step: *dashboard-link
+      - step: *dashboard-link
 
   custom:
     release:
