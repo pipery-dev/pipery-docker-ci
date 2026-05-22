@@ -9,11 +9,21 @@ if [ ! -d "$PROJECT_PATH" ]; then
   exit 1
 fi
 
+PROJECT_PATH="$(cd "$PROJECT_PATH" && pwd)"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ "${GITHUB_ACTIONS:-}" != "true" ] || [ -n "${PIPERY_TEST_PROJECT_PATH:-}" ]; then
   export INPUT_LOG_FILE="$LOG"
   export INPUT_PROJECT_PATH="$PROJECT_PATH"
+
+  if [ -d "$PROJECT_PATH/bin" ]; then
+    export PATH="$PROJECT_PATH/bin:$PATH"
+  fi
+
+  if [ -d "$PROJECT_PATH/mock-bin" ]; then
+    export PATH="$PROJECT_PATH/mock-bin:$PATH"
+  fi
 
   # In test mode use a bash wrapper for psh; the real psh binary has a Go runtime
   # incompatibility (newosproc) with the GitHub Actions runner seccomp profile.

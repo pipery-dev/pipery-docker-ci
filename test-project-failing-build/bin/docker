@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${1:-}" = "build" ]; then
+  printf '[mock docker] build failed intentionally\n' >&2
+  exit 17
+fi
+
+printf '[mock docker] %s\n' "$*"

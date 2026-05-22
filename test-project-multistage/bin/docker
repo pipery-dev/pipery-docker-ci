@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  build)
+    printf '[mock docker] %s\n' "$*"
+    ;;
+  run)
+    printf 'pipery multistage fixture\n'
+    ;;
+  tag)
+    printf '[mock docker] %s\n' "$*"
+    ;;
+  *)
+    printf '[mock docker] %s\n' "$*"
+    ;;
+esac
