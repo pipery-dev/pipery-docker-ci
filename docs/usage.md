@@ -25,4 +25,26 @@ jobs:
       - uses: pipery-dev/pipery-docker-ci@v1
         with:
           project_path: .
+          config_file: 
+          dockerfile: Dockerfile
+          image_name: 
+          image_tag: latest
+          registry: ghcr.io
+          registry_username: 
+          registry_password: 
+          skip_sast: false
+          skip_sca: false
+          skip_lint: false
+          skip_build: false
+          tests_path: 
+          skip_test: false
+          skip_versioning: false
+          skip_packaging: false
+          skip_release: false
+          skip_reintegration: false
+          version_bump: patch
+          github_token: 
+          log_file: pipery.jsonl
+          build_args: 
+          platforms: linux/amd64
 ```
