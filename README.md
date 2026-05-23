@@ -7,7 +7,7 @@ CI pipeline for Docker: lint (hadolint), SAST, SCA, build, test, versioning, pus
 - Owner: `pipery-dev`
 - Repository: `pipery-docker-ci`
 - Marketplace category: `continuous-integration`
-- Current version: `1.0.2`
+- Current version: `1.1.0`
 
 ## Usage
 
